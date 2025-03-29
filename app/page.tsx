@@ -1,103 +1,136 @@
-import Image from "next/image";
+"use client";
 
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import TransactionFeed from "@/components/transaction-feed";
+import RegretHistory from "@/components/regret-history";
+import { mockTransactions } from "@/lib/mock-data";
+import type { Transaction } from "@/lib/types";
+import { toast } from "sonner";
+import { analyzeTransactions } from "@/lib/transaction-analyzer";
+import { useRegretStore } from "@/lib/store";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+let first = true;
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  if (first) {
+    first = false;
+    redirect("/mock-checkout");
+  }
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const [transactions] = useState<Transaction[]>(mockTransactions);
+  const regrets = useRegretStore((state) => state.regrets);
+  const addRegrets = useRegretStore((state) => state.addRegrets);
+  const clearRegrets = useRegretStore((state) => state.clearRegrets);
+  const [isScanning, setIsScanning] = useState(false);
+
+  const handleManualScan = async () => {
+    setIsScanning(true);
+
+    // Simulate loading time
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    // Analyze transactions and generate regrets
+    const newRegrets = await analyzeTransactions(transactions);
+
+    // Add to the store
+    if (newRegrets.length > 0) {
+      addRegrets(newRegrets);
+
+      toast("💸 RegretBot™ Analysis", {
+        description: (
+          <div className="flex flex-col gap-2">
+            <p>{newRegrets[0].roast}</p>
+          </div>
+        ),
+        duration: 15000,
+      });
+    } else {
+      toast("No Regrets Found", {
+        description:
+          "Wow, you're actually being financially responsible. Boring!",
+        duration: 6000,
+      });
+    }
+
+    setIsScanning(false);
+  };
+
+  return (
+    <main className="container max-w-4xl mx-auto py-8">
+      <div className="flex flex-col items-center text-center mb-8">
+        <h1 className="text-4xl font-extrabold tracking-tight mb-2">
+          RegretBot™
+        </h1>
+        <p className="text-muted-foreground text-lg mb-6">
+          The AI that judges your financial decisions so your friends don&apos;t
+          have to
+        </p>
+
+        <div className="flex gap-4">
+          {regrets.length === 0 ? (
+            <Link href="/mock-checkout">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+              >
+                Try Demo Checkout
+              </Button>
+            </Link>
+          ) : (
+            <>
+              <Button
+                size="lg"
+                onClick={handleManualScan}
+                disabled={isScanning}
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+              >
+                {isScanning
+                  ? "Scanning Transactions..."
+                  : "Scan More Transactions"}
+              </Button>
+
+              <Button variant="outline" size="lg" onClick={clearRegrets}>
+                Clear All Regrets
+              </Button>
+            </>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+      </div>
+
+      <Tabs defaultValue="transactions" className="w-full">
+        <TabsList className="grid grid-cols-2 mb-8">
+          <TabsTrigger value="transactions">Transaction Feed</TabsTrigger>
+          <TabsTrigger value="regrets">Regret History</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="transactions">
+          <TransactionFeed transactions={transactions} regrets={regrets} />
+        </TabsContent>
+
+        <TabsContent value="regrets">
+          <RegretHistory
+            regrets={regrets}
+            onRoastAgain={async (transaction) => {
+              const newRegret = await analyzeTransactions([transaction]);
+              if (newRegret.length > 0) {
+                addRegrets(newRegret);
+
+                toast("🔥 Fresh Roast Served!", {
+                  description: (
+                    <div className="flex flex-col gap-2">
+                      <p>{newRegret[0].roast}</p>
+                    </div>
+                  ),
+                  duration: 5000,
+                });
+              }
+            }}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        </TabsContent>
+      </Tabs>
+    </main>
   );
 }
