@@ -1,121 +1,54 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import TransactionFeed from "@/components/transaction-feed";
+import RegretHistory from "@/components/regret-history";
+import { mockTransactions } from "@/lib/mock-data";
+import type { Transaction } from "@/lib/types";
 import { toast } from "sonner";
-import { ElevenLabsClient } from "elevenlabs";
-import OpenAI from "openai";
+import { analyzeTransactions } from "@/lib/transaction-analyzer";
+import { useRegretStore } from "@/lib/store";
 import Link from "next/link";
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey:
-    "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",
-  dangerouslyAllowBrowser: true,
-});
-
-// Initialize ElevenLabs client
-const elevenLabsClient = new ElevenLabsClient({
-  apiKey: "sk_7c3f21888681e8c7b113b5212512d78e74e6fe3b8a572d30",
-});
-
-const VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
-const MODEL_ID = "eleven_multilingual_v2";
+// import { useEffect } from "react";
 
 export default function Home() {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [roastText, setRoastText] = useState("");
+  const [transactions] = useState<Transaction[]>(mockTransactions);
+  const regrets = useRegretStore((state) => state.regrets);
+  const addRegrets = useRegretStore((state) => state.addRegrets);
+  const clearRegrets = useRegretStore((state) => state.clearRegrets);
+  const [isScanning, setIsScanning] = useState(false);
 
-  // Function to generate text using OpenAI
-  const generateText = async () => {
-    try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a sarcastic financial advisor who has personality of Andrew Tate. you roast people's spending habits in his style.",
-          },
-          {
-            role: "user",
-            content:
-              "Generate a funny, sarcastic roast about someone who spent $38 on Burger King delivery late at night. Keep it short, burny and witty.",
-          },
-        ],
-      });
+  const handleManualScan = async () => {
+    setIsScanning(true);
 
-      const generatedText =
-        completion.choices[0].message.content ||
-        "Spending $38 on fast food delivery? That's an expensive way to feel bad about yourself later.";
+    // Simulate loading time
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      setRoastText(generatedText);
-      return generatedText;
-    } catch (error) {
-      console.error("Error generating text:", error);
-      const fallbackText =
-        "Spending $38 on fast food delivery? That's an expensive way to feel bad about yourself later.";
-      setRoastText(fallbackText);
-      return fallbackText;
-    }
-  };
+    // Analyze transactions and generate regrets
+    const newRegrets = await analyzeTransactions(transactions);
 
-  // Function to generate and play audio
-  const generateAndPlayAudio = async (text: string) => {
-    try {
-      console.log("Converting and playing text:", text);
+    // Add to the store
+    if (newRegrets.length > 0) {
+      addRegrets(newRegrets);
 
-      // Convert text to audio
-      const audio = await elevenLabsClient.textToSpeech.convert(VOICE_ID, {
-        text,
-        model_id: MODEL_ID,
-        output_format: "mp3_44100_128",
-      });
-
-      console.log("Audio generated, starting playback...");
-
-      // Collect chunks into a buffer
-      const chunks = [];
-      for await (const chunk of audio) {
-        chunks.push(chunk);
-      }
-      const audioBuffer = new Blob(chunks, { type: "audio/mp3" });
-      const audioUrl = URL.createObjectURL(audioBuffer);
-
-      // Play the audio using the Audio API
-      const audioElement = new Audio(audioUrl);
-      audioElement.play();
-      audioElement.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        console.log("Audio playback completed");
-      };
-
-      return true;
-    } catch (error) {
-      console.error("Failed to generate or play audio:", error);
-      return false;
-    }
-  };
-
-  // Main function to handle the roast generation and audio playback
-  const handleGenerateRoast = async () => {
-    setIsGenerating(true);
-    try {
-      // Generate the roast text
-      const text = await generateText();
-
-      // Display the roast in a toast notification
       toast("💸 RegretBot™ Analysis", {
-        description: <p>{text}</p>,
+        description: (
+          <div className="flex flex-col gap-2">
+            <p>{newRegrets[0].roast}</p>
+          </div>
+        ),
         duration: 15000,
       });
-
-      // Generate and play audio
-      await generateAndPlayAudio(text);
-    } catch (error) {
-      console.error("Error in roast process:", error);
-    } finally {
-      setIsGenerating(false);
+    } else {
+      toast("No Regrets Found", {
+        description:
+          "Wow, you're actually being financially responsible. Boring!",
+        duration: 6000,
+      });
     }
+
+    setIsScanning(false);
   };
 
   return (
@@ -126,34 +59,71 @@ export default function Home() {
         </h1>
         <p className="text-muted-foreground text-lg mb-6">
           The AI that judges your financial decisions so your friends don&apos;t
-          have to.
+          have to
         </p>
+
         <div className="flex gap-4">
-          <Link href="/mock-checkout">
-            <Button
-              size="lg"
-              className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
-            >
-              Try Demo Checkout
-            </Button>
-          </Link>
-          <Button
-            size="lg"
-            onClick={handleGenerateRoast}
-            disabled={isGenerating}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-          >
-            {isGenerating ? "Generating..." : "Generate Roast"}
-          </Button>
+          {regrets.length === 0 ? (
+            <Link href="/mock-checkout">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+              >
+                Try Demo Checkout
+              </Button>
+            </Link>
+          ) : (
+            <>
+              <Button
+                size="lg"
+                onClick={handleManualScan}
+                disabled={isScanning}
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+              >
+                {isScanning
+                  ? "Scanning Transactions..."
+                  : "Scan More Transactions"}
+              </Button>
+
+              <Button variant="outline" size="lg" onClick={clearRegrets}>
+                Clear All Regrets
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
-      {roastText && (
-        <div className="mt-8 p-6 bg-slate-100 dark:bg-slate-800 rounded-lg">
-          <h2 className="text-xl font-bold mb-4">Latest Roast:</h2>
-          <p className="text-lg">{roastText}</p>
-        </div>
-      )}
+      <Tabs defaultValue="transactions" className="w-full">
+        <TabsList className="grid grid-cols-2 mb-8">
+          <TabsTrigger value="transactions">Transaction Feed</TabsTrigger>
+          <TabsTrigger value="regrets">Regret History</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="transactions">
+          <TransactionFeed transactions={transactions} regrets={regrets} />
+        </TabsContent>
+
+        <TabsContent value="regrets">
+          <RegretHistory
+            regrets={regrets}
+            onRoastAgain={async (transaction) => {
+              const newRegret = await analyzeTransactions([transaction]);
+              if (newRegret.length > 0) {
+                addRegrets(newRegret);
+
+                toast("🔥 Fresh Roast Served!", {
+                  description: (
+                    <div className="flex flex-col gap-2">
+                      <p>{newRegret[0].roast}</p>
+                    </div>
+                  ),
+                  duration: 5000,
+                });
+              }
+            }}
+          />
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }
